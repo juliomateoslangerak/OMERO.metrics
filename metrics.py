@@ -9,20 +9,37 @@ from skimage.feature import peak_local_max
 from scipy.spatial.distance import cdist
 import numpy as np
 from itertools import permutations
+from functools import reduce
 
 
-class BeadsField2D:
+class Image:
     """
-    Docs in here
+    This is the top level abstraction of an metrics image. It is supposed to manage all generalities concerning
+    the raw data and metadata.
     """
     def __init__(self,
                  image: np.ndarray,
                  dimensions: tuple = ('z', 'c', 'x', 'y'),
-                 pixel_size_um = None,
+                 pixel_size_um=None,
                  ):
         self.image = image
         self.dimensions = dimensions
         self.pixel_size_um = pixel_size_um
+
+
+
+class PointSourceImage(Image):
+    """
+    An image containing one or any other type of point source
+    """
+
+
+class BeadsField2D(Point_source_image):
+    """
+    Docs in here
+    """
+    def __init__(self):
+        super.__init__()
         self.labels_image = np.zeros(self.image.shape, dtype=np.uint16)
         self.properties = list()
         self.positions = list()
@@ -31,7 +48,7 @@ class BeadsField2D:
         # TODO: reshape image if dimensions is not default
         # TODO: implement drift for a time dimension
 
-    def segment_channel(self, channel, sigma, method='local_maxima'):
+    def segment_channel(self, channel, sigma, method='local_maxima', remove_center_spot=True):
         """Segment a given channel (3D numpy narray) to find the spots"""
         thresh = threshold_otsu(channel)
 
@@ -53,7 +70,19 @@ class BeadsField2D:
 
         bw = closing(thresholded, cube(sigma))
         cleared = clear_border(bw)
-        return label(cleared)
+
+        labels = label(cleared)
+
+        if remove_center_spot:
+            areas = [(r.label, r.area) for r in regionprops(labels)]
+            l = None
+            a = 0
+            for new_l, new_a in areas:
+                if new_a > a:
+                    a = new_a
+                    l = new_l
+            labels[labels == a] = 0
+        return labels
 
     def segment_image(self):
         for c in range(self.image.shape[1]):
