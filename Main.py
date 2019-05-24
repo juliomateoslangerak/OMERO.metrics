@@ -14,7 +14,7 @@ n_channels = raw_img.shape[1]
 x_size = raw_img.shape[2]
 y_size = raw_img.shape[3]
 
-BF = metrics.BeadsField2D(raw_img)
+BF = metrics.BeadsField2D(image=raw_img)
 
 BF.segment_image()
 BF.compute_image_properties()

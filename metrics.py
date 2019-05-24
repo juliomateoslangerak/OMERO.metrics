@@ -21,35 +21,46 @@ class Image:
                  image: np.ndarray,
                  dimensions: tuple = ('z', 'c', 'x', 'y'),
                  pixel_size_um=None,
-                 ):
+                 **kwargs):
         self.image = image
         self.dimensions = dimensions
         self.pixel_size_um = pixel_size_um
-
 
 
 class PointSourceImage(Image):
     """
     An image containing one or any other type of point source
     """
-
-
-class BeadsField2D(Point_source_image):
-    """
-    Docs in here
-    """
-    def __init__(self):
-        super.__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.labels_image = np.zeros(self.image.shape, dtype=np.uint16)
         self.properties = list()
         self.positions = list()
         self.channel_permutations = list()
         self.distances = list()
+
+    def _remove_outliers(self, input_labels, criteria):
+        criteria = [(r.label, r.area) for r in regionprops(labels)]
+        l = None
+        v = 0
+        for new_l, new_v in criteria:
+            if new_v > v:
+                v = new_v
+                l = new_l
+        labels[labels == l] = 0
+
+
+class BeadsField2D(PointSourceImage):
+    """
+    Docs in here
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # TODO: reshape image if dimensions is not default
         # TODO: implement drift for a time dimension
 
     def segment_channel(self, channel, sigma, method='local_maxima', remove_center_spot=True):
-        """Segment a given channel (3D numpy narray) to find the spots"""
+        """Segment a given channel (3D numpy ndarray) to find the spots"""
         thresh = threshold_otsu(channel)
 
         gauss_filtered = np.copy(channel)
@@ -81,7 +92,7 @@ class BeadsField2D(Point_source_image):
                 if new_a > a:
                     a = new_a
                     l = new_l
-            labels[labels == a] = 0
+            labels[labels == l] = 0
         return labels
 
     def segment_image(self):
