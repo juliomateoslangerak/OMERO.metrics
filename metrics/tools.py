@@ -14,7 +14,7 @@ from itertools import permutations
 from dask import delayed
 import logging
 
-
+@delayed
 def _segment_single_channel(channel, min_distance, sigma, method, hysteresis_levels):
     """Segment a channel (3D numpy array)"""
     threshold = threshold_otsu(channel)
@@ -52,17 +52,32 @@ def _segment_single_channel(channel, min_distance, sigma, method, hysteresis_lev
     return label(cleared)
 
 
+@delayed
+def merge_channel_segmentation(x, output_shape):
+    # We create an empty array to store the output
+    output = np.zeros(output_shape, dtype=np.uint16)
+    for c in range(output.shape[1]):
+        output[..., c, :, :] = x[c]
+
+    return output
+
+
+# _segment_single_channel_lazy = delayed(_segment_single_channel)
+
+
 def segment_image(image, min_distance=20, sigma=(1, 2, 2), method='local_max', hysteresis_levels=(.6, .9)):
     """Segment an image and return a labels object"""
-    # We create an empty array to store the output
-    labels_image = np.zeros(image.shape, dtype=np.uint16)
+    channels = list()
     for c in range(image.shape[-3]):  # TODO: Deal with Time here
-        labels_image[..., c, :, :] = _segment_single_channel(image[..., c, :, :],
-                                                             min_distance=min_distance,
-                                                             sigma=sigma,
-                                                             method=method,
-                                                             hysteresis_levels=hysteresis_levels)
-    return labels_image
+        channels.append(_segment_single_channel(image[..., c, :, :],
+                                                min_distance=min_distance,
+                                                sigma=sigma,
+                                                method=method,
+                                                hysteresis_levels=hysteresis_levels))
+
+    labels_image = merge_channel_segmentation(channels, image.shape)
+
+    return labels_image.compute()
 
 
 def _compute_channel_spots_properties(channel, label_channel, remove_center_cross, pixel_size=None):
